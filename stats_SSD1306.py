@@ -23,6 +23,8 @@ import time
 import Adafruit_GPIO.SPI as SPI
 import Adafruit_SSD1306
 
+from pijuice import (PiJuice)
+
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
@@ -42,6 +44,8 @@ SPI_DEVICE = 0
 # DC = 'P9_15'
 # SPI_PORT = 1
 # SPI_DEVICE = 0
+
+pijuice = PiJuice(1, 0x14)
 
 # 128x32 display with hardware I2C:
 disp = Adafruit_SSD1306.SSD1306_128_32(rst=RST)
@@ -102,6 +106,13 @@ font = ImageFont.load_default()
 # Some other nice fonts to try: http://www.dafont.com/bitmap.php
 # font = ImageFont.truetype('Minecraftia.ttf', 8)
 
+def getCmdStr(cmd):
+    return subprocess.check_output(cmd, shell = True).decode('utf-8').strip()
+
+def checkValue(val):
+    val = val['data'] if val['error'] == 'NO_ERROR' else val['error']
+    return val
+
 while True:
 
     # Draw a black filled box to clear the image.
@@ -109,22 +120,32 @@ while True:
 
     # Shell scripts for system monitoring from here : https://unix.stackexchange.com/questions/119126/command-to-display-memory-usage-disk-usage-and-cpu-load
     cmd = "hostname -I | cut -d\' \' -f1"
-    IP = subprocess.check_output(cmd, shell = True )
-    cmd = "top -bn1 | grep load | awk '{printf \"CPU Load: %.2f\", $(NF-2)}'"
-    CPU = subprocess.check_output(cmd, shell = True )
-    cmd = "free -m | awk 'NR==2{printf \"Mem: %s/%sMB %.2f%%\", $3,$2,$3*100/$2 }'"
-    MemUsage = subprocess.check_output(cmd, shell = True )
-    cmd = "df -h | awk '$NF==\"/\"{printf \"Disk: %d/%dGB %s\", $3,$2,$5}'"
-    Disk = subprocess.check_output(cmd, shell = True )
+    IP = getCmdStr(cmd)
+    cmd = "uptime | awk '{printf $3 $8 $9 $10}'"
+    CPU = getCmdStr(cmd)
+    cmd = "free -m | awk 'NR==2{printf \"%s/%sMB %.2f%%\", $3,$2,$3*100/$2 }'"
+    MemUsage = getCmdStr(cmd)
+    cmd = "df -h | awk '$NF==\"/\"{printf \"%d/%dGB %s\", $3,$2,$5}'"
+    Disk = getCmdStr(cmd)
 
-    # Write two lines of text.
+    charge = checkValue(pijuice.status.GetChargeLevel())
+    fault =  checkValue(pijuice.status.GetFaultStatus())
+    temp = checkValue(pijuice.status.GetBatteryTemperature())
+    vbat = checkValue(pijuice.status.GetBatteryVoltage())
+    ibat = checkValue(pijuice.status.GetBatteryCurrent())
+    vio =  checkValue(pijuice.status.GetIoVoltage())
+    iio = checkValue(pijuice.status.GetIoCurrent())
+    print('Charge =',charge,'%,', 'T =', temp, ', Vbat =',vbat, ', Ibat =',ibat, ', Vio =',vio, ', Iio =',iio)
 
-    draw.text((x, top),       "IP: " + str(IP),  font=font, fill=255)
-    draw.text((x, top+8),     str(CPU), font=font, fill=255)
-    draw.text((x, top+16),    str(MemUsage),  font=font, fill=255)
-    draw.text((x, top+25),    str(Disk),  font=font, fill=255)
+
+    print(pijuice.status.GetStatus())
+
+    draw.text((x, top),       IP,  font=font, fill=255)
+    draw.text((x, top+8),     CPU, font=font, fill=255)
+    draw.text((x, top+16),    "M: " + MemUsage,  font=font, fill=255)
+    draw.text((x, top+25),    "D: " + Disk,  font=font, fill=255)
 
     # Display image.
     disp.image(image)
     disp.display()
-    time.sleep(.1)
+    time.sleep(.3)
