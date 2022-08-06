@@ -78,6 +78,12 @@ font = ImageFont.load_default()
 # Some other nice fonts to try: http://www.dafont.com/bitmap.php
 # font = ImageFont.truetype('Minecraftia.ttf', 8)
 
+def cputemp():
+    f = open("/sys/class/thermal/thermal_zone0/temp")
+    CPUTemp = f.read()
+    f.close()
+    return int(CPUTemp)/1000.0
+
 def getCmdStr(cmd):
     return subprocess.check_output(cmd, shell = True).decode('utf-8').strip()
 
@@ -93,29 +99,29 @@ while True:
     # Shell scripts for system monitoring from here : https://unix.stackexchange.com/questions/119126/command-to-display-memory-usage-disk-usage-and-cpu-load
     cmd = "hostname -I | cut -d\' \' -f1"
     IP = getCmdStr(cmd)
-    cmd = "uptime | awk '{printf $3 $8 $9 $10}'"
+    cmd = "uptime | awk '{printf $3 $8}'"
     CPU = getCmdStr(cmd)
-    cmd = "free -m | awk 'NR==2{printf \"%s/%sMB %.2f%%\", $3,$2,$3*100/$2 }'"
+    cmd = "free -m | awk 'NR==2{printf \"%s/%sMB\", $3,$2 }'"
     MemUsage = getCmdStr(cmd)
-    cmd = "df -h | awk '$NF==\"/\"{printf \"%d/%dGB %s\", $3,$2,$5}'"
+    cmd = "df -h | awk '$NF==\"/\"{printf \"%d/%dGB\", $3,$2}'"
     Disk = getCmdStr(cmd)
 
     charge = checkValue(pijuice.status.GetChargeLevel())
-    fault =  checkValue(pijuice.status.GetFaultStatus())
+    #fault =  checkValue(pijuice.status.GetFaultStatus())
     temp = checkValue(pijuice.status.GetBatteryTemperature())
     vbat = checkValue(pijuice.status.GetBatteryVoltage())
     ibat = checkValue(pijuice.status.GetBatteryCurrent())
     vio =  checkValue(pijuice.status.GetIoVoltage())
     iio = checkValue(pijuice.status.GetIoCurrent())
-    print('Charge =',charge,'%,', 'T =', temp, ', Vbat =',vbat, ', Ibat =',ibat, ', Vio =',vio, ', Iio =',iio)
+    #print('Charge =',charge,'%,', 'T =', temp, ', Vbat =',vbat, ', Ibat =',ibat, ', Vio =',vio, ', Iio =',iio)
+    pijstr = ("%i%%%.0f\xb0 %.2fV %.0fmA %.2fV %.0fmA" % (charge, temp, vbat/1000, ibat, vio/1000, iio))
+    #print(pijstr)
+    #print(pijuice.status.GetStatus())
 
-
-    print(pijuice.status.GetStatus())
-
-    draw.text((x, top),       IP,  font=font, fill=255)
-    draw.text((x, top+8),     CPU, font=font, fill=255)
-    draw.text((x, top+16),    "M: " + MemUsage,  font=font, fill=255)
-    draw.text((x, top+25),    "D: " + Disk,  font=font, fill=255)
+    draw.text((x, top),     IP,  font=font, fill=255)
+    draw.text((x, top+8),   (CPU + " %.1f\xb0" % cputemp()), font=font, fill=255)
+    draw.text((x, top+16),  pijstr,  font=font, fill=255)
+    draw.text((x, 23),      MemUsage + " " + Disk,  font=font, fill=255)
 
     # Display image.
     disp.image(image)
